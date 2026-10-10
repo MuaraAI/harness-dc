@@ -25,5 +25,5 @@ Thumbs.db
 *.swp
 *.swo
 
-# Knowledge Graph cache
-graphify-out/cache/
+# Knowledge Graph
+graphify-out/
