@@ -25,5 +25,8 @@ Thumbs.db
 *.swp
 *.swo
 
+# Documentation / internal specs
+docs/
+
 # Knowledge Graph
 graphify-out/
