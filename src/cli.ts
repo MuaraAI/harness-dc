@@ -198,7 +198,19 @@ async function main() {
   }
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+import { fileURLToPath } from "node:url";
+
+const isDirectRun = (() => {
+  try {
+    const entryPath = fs.realpathSync(process.argv[1]);
+    const currentPath = fileURLToPath(import.meta.url);
+    return entryPath === currentPath;
+  } catch {
+    return false;
+  }
+})();
+
+if (isDirectRun) {
   main().catch((err) => {
     console.error("[harness-dc] Fatal error:", err);
     process.exit(1);
