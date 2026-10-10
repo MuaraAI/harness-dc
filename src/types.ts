@@ -1,4 +1,4 @@
-export type AgentKey = "hermes" | "antigravity" | "claude" | string;
+export type AgentKey = "hermes" | "antigravity" | "claude" | (string & {});
 
 export interface AgentDefinition {
   key: AgentKey;

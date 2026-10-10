@@ -28,4 +28,9 @@ describe("CLI Argument Parser", () => {
     const parsed = parseCliArgs(["--help"]);
     expect(parsed.help).toBe(true);
   });
+
+  it("should route unknown subcommands to help", () => {
+    const parsed = parseCliArgs(["unknown-command"]);
+    expect(parsed.command).toBe("help");
+  });
 });

@@ -44,6 +44,19 @@ describe("Process Scanner & Workspace Resolver", () => {
       const match = matchProcessAgent("bash", "/bin/bash", DEFAULT_AGENTS);
       expect(match).toBeNull();
     });
+
+    it("should NOT false-positive on commands referencing agent paths in arguments", () => {
+      expect(matchProcessAgent("vim", "vim /path/to/bin/hermes", DEFAULT_AGENTS)).toBeNull();
+      expect(matchProcessAgent("git", "git diff bin/hermes", DEFAULT_AGENTS)).toBeNull();
+      expect(matchProcessAgent("grep", "grep -rn bin/agy .", DEFAULT_AGENTS)).toBeNull();
+      expect(matchProcessAgent("node", "node dist/cli.js start", DEFAULT_AGENTS)).toBeNull();
+    });
+
+    it("should match python -m hermes invocation", () => {
+      const match = matchProcessAgent("python3", "python3 -m hermes", DEFAULT_AGENTS);
+      expect(match).toBeDefined();
+      expect(match?.key).toBe("hermes");
+    });
   });
 
   describe("resolveProcessCwd", () => {

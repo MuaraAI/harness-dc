@@ -133,4 +133,28 @@ describe("HarnessDaemon State Machine & Polling Loop", () => {
     expect(daemon.status.state).toBe("idle");
     expect(clearActivityCalls).toBe(1);
   });
+
+  it("should ignore workspaces listed in ignoredWorkspaces", async () => {
+    const fakeAgentInfo: ActiveAgentInfo = {
+      agent: DEFAULT_AGENTS[0],
+      pid: 1234,
+      cwd: "/home/curzy/secret-vault",
+      workspaceName: "secret-vault",
+      startTime: Date.now(),
+    };
+
+    const scannerMock = vi.fn(async () => fakeAgentInfo);
+    const daemon = new HarnessDaemon({
+      ipcClient: mockIpc as DiscordIpcClient,
+      scanner: scannerMock,
+      config: {
+        ignoredWorkspaces: ["secret-vault"],
+      },
+    });
+
+    await daemon.tick();
+
+    expect(daemon.status.state).toBe("idle");
+    expect(sendActivityCalls.length).toBe(0);
+  });
 });

@@ -1,4 +1,5 @@
 import net from "node:net";
+import fs from "node:fs";
 import crypto from "node:crypto";
 import { getSocketPaths } from "./constants.js";
 import type { ActivityPayload } from "./types.js";
@@ -10,6 +11,8 @@ export const OPCODES = {
   PING: 3,
   PONG: 4,
 } as const;
+
+const MAX_PACKET_SIZE = 64 * 1024; // 64 KB safety threshold
 
 export class DiscordIpcClient {
   private socket: net.Socket | null = null;
@@ -31,6 +34,18 @@ export class DiscordIpcClient {
     }
 
     for (const socketPath of this.candidatePaths) {
+      // Pre-check socket existence on Unix platforms
+      if (process.platform !== "win32") {
+        try {
+          const stat = fs.lstatSync(socketPath);
+          if (!stat.isSocket()) continue;
+          const uid = typeof process.getuid === "function" ? process.getuid() : 0;
+          if (stat.uid !== uid && stat.uid !== 0) continue; // Must be user-owned or root-owned
+        } catch {
+          continue;
+        }
+      }
+
       try {
         const connected = await this.tryConnectSocket(socketPath, clientId);
         if (connected) {
@@ -58,44 +73,80 @@ export class DiscordIpcClient {
           resolved = true;
           socket.destroy();
           resolve(false);
+        } else {
+          this.disconnect();
         }
       };
 
       socket.setTimeout(2500);
 
-      socket.on("error", () => {
-        cleanup();
-      });
-
-      socket.on("timeout", () => {
-        cleanup();
-      });
+      socket.on("error", () => cleanup());
+      socket.on("timeout", () => cleanup());
+      socket.on("close", () => cleanup());
+      socket.on("end", () => cleanup());
 
       socket.on("connect", () => {
-        // Send HANDSHAKE (opcode 0)
         const handshakePayload = JSON.stringify({
           v: 1,
           client_id: clientId,
         });
-        this.writeFrame(socket, OPCODES.HANDSHAKE, handshakePayload);
+        try {
+          this.writeFrame(socket, OPCODES.HANDSHAKE, handshakePayload);
+        } catch {
+          cleanup();
+        }
       });
 
-      socket.on("data", (data) => {
-        if (data.length >= 8) {
-          const opcode = data.readUInt32LE(0);
+      let buffer = Buffer.alloc(0);
+
+      socket.on("data", (chunk) => {
+        buffer = Buffer.concat([buffer, chunk]);
+        if (buffer.length > MAX_PACKET_SIZE + 8) {
+          cleanup();
+          return;
+        }
+
+        while (buffer.length >= 8) {
+          const opcode = buffer.readUInt32LE(0);
+          const length = buffer.readUInt32LE(4);
+
+          if (length > MAX_PACKET_SIZE) {
+            cleanup();
+            return;
+          }
+
+          if (buffer.length < 8 + length) {
+            break; // Wait for full packet
+          }
+
+          if (opcode === OPCODES.CLOSE) {
+            cleanup();
+            return;
+          }
+
           if (opcode === OPCODES.FRAME && !resolved) {
             resolved = true;
             socket.setTimeout(0);
             this.socket = socket;
 
-            // Handle subsequent socket lifecycle
+            // Remove connect-time cleanup handler now that socket is active
+            socket.removeAllListeners("close");
+            socket.removeAllListeners("error");
+
             socket.on("close", () => {
+              this.isConnected = false;
+              this.socket = null;
+            });
+            socket.on("error", () => {
               this.isConnected = false;
               this.socket = null;
             });
 
             resolve(true);
+            return;
           }
+
+          buffer = buffer.subarray(8 + length);
         }
       });
     });
@@ -127,8 +178,7 @@ export class DiscordIpcClient {
     try {
       this.writeFrame(this.socket, OPCODES.FRAME, payload);
     } catch {
-      this.isConnected = false;
-      this.socket = null;
+      this.disconnect();
     }
   }
 

@@ -1,4 +1,6 @@
 import path from "node:path";
+import os from "node:os";
+import fs from "node:fs";
 import type { AgentDefinition } from "./types.js";
 
 export const DEFAULT_AGENTS: AgentDefinition[] = [
@@ -30,24 +32,37 @@ export function getSocketPaths(): string[] {
 
   if (isWindows) {
     for (let i = 0; i < 10; i++) {
+      candidates.push(`\\\\.\\pipe\\discord-ipc-${i}`);
       candidates.push(`\\\\?\\pipe\\discord-ipc-${i}`);
     }
     return candidates;
   }
 
-  const uid = typeof process.getuid === "function" ? process.getuid() : 1000;
-  const xdg = process.env.XDG_RUNTIME_DIR || `/run/user/${uid}`;
-  const tmpDirs = [
-    xdg,
-    path.join(xdg, "app/com.discordapp.Discord"),
-    path.join(xdg, "snap.discord"),
-    process.env.TMPDIR,
-    process.env.TMP,
-    process.env.TEMP,
-    "/tmp",
-  ].filter(Boolean) as string[];
+  const tmpDirs: string[] = [];
+  const uid = typeof process.getuid === "function" ? process.getuid() : null;
 
-  for (const dir of tmpDirs) {
+  if (process.env.XDG_RUNTIME_DIR) {
+    const xdg = process.env.XDG_RUNTIME_DIR;
+    tmpDirs.push(
+      xdg,
+      path.join(xdg, "app/com.discordapp.Discord"),
+      path.join(xdg, "app/com.discordapp.DiscordCanary"),
+      path.join(xdg, "app/dev.vencord.Vesktop"),
+      path.join(xdg, "snap.discord")
+    );
+  } else if (process.platform === "linux" && uid !== null) {
+    tmpDirs.push(`/run/user/${uid}`);
+  }
+
+  tmpDirs.push(os.tmpdir());
+  if (process.env.TMPDIR) tmpDirs.push(process.env.TMPDIR);
+  if (process.env.TMP) tmpDirs.push(process.env.TMP);
+  if (process.env.TEMP) tmpDirs.push(process.env.TEMP);
+  tmpDirs.push("/tmp");
+
+  const validDirs = Array.from(new Set(tmpDirs.filter((d) => Boolean(d) && fs.existsSync(d))));
+
+  for (const dir of validDirs) {
     for (let i = 0; i < 10; i++) {
       candidates.push(path.join(dir, `discord-ipc-${i}`));
     }

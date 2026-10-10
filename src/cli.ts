@@ -3,8 +3,8 @@
 import { parseArgs } from "node:util";
 import fs from "node:fs";
 import path from "node:path";
-import os from "node:os";
 import { spawn } from "node:child_process";
+import { fileURLToPath } from "node:url";
 import { HarnessDaemon } from "./daemon.js";
 import { getConfigPath } from "./config.js";
 
@@ -39,7 +39,9 @@ export function parseCliArgs(argv: string[]): ParsedCli {
   } else if (positionals.length > 0) {
     const first = positionals[0].toLowerCase();
     if (["start", "daemon", "stop", "status"].includes(first)) {
-      command = first as any;
+      command = first as ParsedCli["command"];
+    } else {
+      command = "help";
     }
   }
 
@@ -56,6 +58,18 @@ function getPidFilePath(): string {
   return path.join(configDir, "daemon.pid");
 }
 
+function readValidPid(pidFile: string): number | null {
+  try {
+    if (!fs.existsSync(pidFile)) return null;
+    const raw = fs.readFileSync(pidFile, "utf-8").trim();
+    const pid = Number(raw);
+    if (Number.isInteger(pid) && pid > 1) {
+      return pid;
+    }
+  } catch {}
+  return null;
+}
+
 function printBanner() {
   console.log("\x1b[36m========================================\x1b[0m");
   console.log("\x1b[1m\x1b[35m  Harness-DC\x1b[0m \x1b[90m— Discord Rich Presence\x1b[0m");
@@ -66,13 +80,23 @@ function printBanner() {
 async function handleStart(privacy: boolean) {
   printBanner();
   console.log(`[harness-dc] Mode: \x1b[32mForeground\x1b[0m`);
-  console.log(`[harness-dc] Privacy: ${privacy ? "\x1b[33mEnabled\x1b[0m" : "\x1b[90mDisabled\x1b[0m"}`);
+  console.log(`[harness-dc] Privacy: ${privacy ? "\x1b[33mEnabled\x1b[0m" : "\x1b[90mAuto (from config/cli)\x1b[0m"}`);
   console.log(`[harness-dc] Watching process table for Hermes / Antigravity...\n`);
 
-  const daemon = new HarnessDaemon({ privacyMode: privacy });
+  // Only override config if CLI explicitly passed --privacy
+  const daemon = new HarnessDaemon(privacy ? { privacyMode: true } : {});
 
   const shutdown = async () => {
     console.log(`\n[harness-dc] Shutting down, clearing Discord presence...`);
+    try {
+      const pidFile = getPidFilePath();
+      if (fs.existsSync(pidFile)) {
+        const recordedPid = readValidPid(pidFile);
+        if (recordedPid === process.pid) {
+          fs.unlinkSync(pidFile);
+        }
+      }
+    } catch {}
     await daemon.stop();
     process.exit(0);
   };
@@ -86,34 +110,53 @@ async function handleStart(privacy: boolean) {
 async function handleDaemon(privacy: boolean) {
   printBanner();
   const pidFile = getPidFilePath();
-  fs.mkdirSync(path.dirname(pidFile), { recursive: true });
+  fs.mkdirSync(path.dirname(pidFile), { recursive: true, mode: 0o700 });
 
   if (fs.existsSync(pidFile)) {
-    const existingPid = Number(fs.readFileSync(pidFile, "utf-8").trim());
-    try {
-      process.kill(existingPid, 0);
-      console.log(`\x1b[33m[harness-dc] Daemon is already running (PID: ${existingPid})\x1b[0m`);
-      return;
-    } catch {
-      // Stale PID file
-      fs.unlinkSync(pidFile);
+    const existingPid = readValidPid(pidFile);
+    if (existingPid) {
+      try {
+        process.kill(existingPid, 0);
+        console.log(`\x1b[33m[harness-dc] Daemon is already running (PID: ${existingPid})\x1b[0m`);
+        return;
+      } catch (err: any) {
+        if (err?.code === "ESRCH") {
+          try { fs.unlinkSync(pidFile); } catch {}
+        } else {
+          console.error(`\x1b[31m[harness-dc] Cannot inspect PID ${existingPid}: ${err.message}\x1b[0m`);
+          return;
+        }
+      }
+    } else {
+      try { fs.unlinkSync(pidFile); } catch {}
     }
   }
 
-  const scriptPath = process.argv[1];
-  const args = ["start"];
+  // Prevent symlink following
+  try {
+    if (fs.lstatSync(pidFile).isSymbolicLink()) {
+      fs.unlinkSync(pidFile);
+    }
+  } catch {}
+
+  const scriptPath = path.resolve(process.argv[1]);
+  const args = [scriptPath, "start"];
   if (privacy) args.push("--privacy");
 
-  const child = spawn(process.execPath, [scriptPath, ...args], {
+  const child = spawn(process.execPath, args, {
     detached: true,
     stdio: "ignore",
     env: process.env,
   });
 
+  child.on("error", (err) => {
+    console.error("[harness-dc] Failed to spawn background daemon:", err.message);
+  });
+
   child.unref();
 
   if (child.pid) {
-    fs.writeFileSync(pidFile, String(child.pid), "utf-8");
+    fs.writeFileSync(pidFile, String(child.pid), { encoding: "utf-8", mode: 0o600 });
     console.log(`\x1b[32m✓ harness-dc daemon started in background (PID: ${child.pid})\x1b[0m`);
     console.log(`Use \x1b[36mharness-dc status\x1b[0m to check or \x1b[31mharness-dc stop\x1b[0m to terminate.`);
   }
@@ -126,10 +169,33 @@ async function handleStop() {
     return;
   }
 
-  const pid = Number(fs.readFileSync(pidFile, "utf-8").trim());
+  const pid = readValidPid(pidFile);
+  if (!pid) {
+    console.log(`[harness-dc] Removed invalid daemon PID file.`);
+    try { fs.unlinkSync(pidFile); } catch {}
+    return;
+  }
+
   try {
     process.kill(pid, "SIGTERM");
-    console.log(`\x1b[32m✓ harness-dc daemon (PID: ${pid}) stopped.\x1b[0m`);
+
+    // Wait up to 2 seconds for graceful exit
+    let alive = true;
+    for (let i = 0; i < 20; i++) {
+      try {
+        process.kill(pid, 0);
+        await new Promise((r) => setTimeout(r, 100));
+      } catch {
+        alive = false;
+        break;
+      }
+    }
+
+    if (!alive) {
+      console.log(`\x1b[32m✓ harness-dc daemon (PID: ${pid}) stopped.\x1b[0m`);
+    } else {
+      console.log(`\x1b[33m! Sent SIGTERM to daemon (PID: ${pid})\x1b[0m`);
+    }
   } catch {
     console.log(`[harness-dc] Daemon process (PID: ${pid}) was not running.`);
   } finally {
@@ -146,7 +212,13 @@ async function handleStatus() {
     return;
   }
 
-  const pid = Number(fs.readFileSync(pidFile, "utf-8").trim());
+  const pid = readValidPid(pidFile);
+  if (!pid) {
+    console.log(`[harness-dc] Daemon PID file is \x1b[31minvalid or corrupt\x1b[0m.`);
+    try { fs.unlinkSync(pidFile); } catch {}
+    return;
+  }
+
   try {
     process.kill(pid, 0);
     console.log(`[harness-dc] Daemon is \x1b[32mrunning\x1b[0m (PID: ${pid}).`);
@@ -197,8 +269,6 @@ async function main() {
       break;
   }
 }
-
-import { fileURLToPath } from "node:url";
 
 const isDirectRun = (() => {
   try {
