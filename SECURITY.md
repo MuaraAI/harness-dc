@@ -13,7 +13,7 @@ We take the security of `harness-dc` seriously. If you discover a security vulne
 Instead, please report it via one of the following channels:
 
 1. **GitHub Private Vulnerability Reporting:** Submit a report via the [Security tab](https://github.com/MuaraAI/harness-dc/security/advisories/new) of this repository.
-2. **Email:** Send details to [curzy@muaraai.com](mailto:curzy@muaraai.com).
+2. **Email:** Send details to [admin@muaraai.com](mailto:admin@muaraai.com).
 
 ### What to Include
 
