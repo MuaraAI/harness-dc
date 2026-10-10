@@ -1,0 +1,50 @@
+name: Bug Report
+description: Create a report to help us fix a bug in harness-dc
+title: "fix: [short bug description]"
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: Thanks for reporting an issue! Please provide as much detail as possible.
+  - type: input
+    id: version
+    attributes:
+      label: harness-dc Version
+      description: Run `harness-dc --version` or `npx @muaraai/harness-dc --version`
+      placeholder: e.g. 0.1.0
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating System
+      options:
+        - Linux (Native pacman/deb/rpm)
+        - Linux (Flatpak Discord)
+        - Linux (Snap Discord)
+        - macOS
+        - Windows 10/11
+    validations:
+      required: true
+  - type: dropdown
+    id: agent
+    attributes:
+      label: Active AI Agent
+      options:
+        - Hermes Agent
+        - Antigravity CLI / 2.0
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: description
+    attributes:
+      label: What happened?
+      description: Clear and concise description of what went wrong.
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant Terminal / Discord Logs
+      render: shell

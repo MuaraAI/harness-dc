@@ -1,0 +1,35 @@
+name: New Agent Request
+description: Request support for a new AI coding agent in harness-dc
+title: "feat(agent): add support for [Agent Name]"
+labels: ["enhancement", "new-agent"]
+body:
+  - type: markdown
+    attributes:
+      value: Request a new coding agent to be supported out of the box in `harness-dc`!
+  - type: input
+    id: agent_name
+    attributes:
+      label: Agent Name
+      placeholder: e.g. Aider, Goose, OpenCode, Codex
+    validations:
+      required: true
+  - type: input
+    id: binary_name
+    attributes:
+      label: Process / Binary Names
+      placeholder: e.g. aider, goose-cli
+      description: The command name or process name as seen in `ps` / `pgrep`.
+    validations:
+      required: true
+  - type: input
+    id: repo_url
+    attributes:
+      label: Agent Repository or Documentation URL
+      placeholder: https://github.com/...
+    validations:
+      required: true
+  - type: textarea
+    id: discord_id
+    attributes:
+      label: Discord Client ID (if available)
+      description: If you or the maintainers have created a Discord Application ID with logos, share it here.
