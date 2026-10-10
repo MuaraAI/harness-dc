@@ -1,0 +1,46 @@
+{
+  "name": "@muaraai/harness-dc",
+  "version": "0.1.0",
+  "description": "Discord Rich Presence daemon for AI coding agents (Hermes Agent & Antigravity)",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "bin": {
+    "harness-dc": "./dist/cli.js"
+  },
+  "files": [
+    "dist",
+    "LICENSE",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc --watch",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "start": "node ./dist/cli.js start"
+  },
+  "keywords": [
+    "discord",
+    "rich-presence",
+    "hermes-agent",
+    "antigravity",
+    "rpc",
+    "muaraai"
+  ],
+  "author": "Yuken Velino <curzy@muaraai.com>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/MuaraAI/harness-dc.git"
+  },
+  "bugs": {
+    "url": "https://github.com/MuaraAI/harness-dc/issues"
+  },
+  "homepage": "https://github.com/MuaraAI/harness-dc#readme",
+  "devDependencies": {
+    "@types/node": "^22.13.0",
+    "typescript": "^5.7.3",
+    "vitest": "^5.0.3"
+  }
+}
