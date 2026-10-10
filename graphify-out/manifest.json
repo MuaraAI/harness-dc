@@ -88,5 +88,35 @@
     "seen": 1791637318.9604964,
     "ast_hash": "496deb3b550382a8ec75b19b3590b2d4",
     "semantic_hash": "496deb3b550382a8ec75b19b3590b2d4"
+  },
+  ".github/workflows/ci.yml": {
+    "mtime": 1791637072.7269144,
+    "seen": 1791637693.2515156,
+    "ast_hash": "7178c4d626bc253244a980684897c8a4",
+    "semantic_hash": ""
+  },
+  ".github/workflows/publish.yml": {
+    "mtime": 1791637080.563901,
+    "seen": 1791637693.2515204,
+    "ast_hash": "faa546b2013eb7b5ed71f4d562b46e54",
+    "semantic_hash": ""
+  },
+  "README.md": {
+    "mtime": 1791637062.2839324,
+    "seen": 1791637693.2515247,
+    "ast_hash": "e91843bb34f1ac6d62c6ecb175f8a96b",
+    "semantic_hash": ""
+  },
+  "docs/prd/2026-10-10-harness-dc.md": {
+    "mtime": 1791635914.6996973,
+    "seen": 1791637693.2515278,
+    "ast_hash": "5f71aa03d9ac0ee17cfd664ce8049707",
+    "semantic_hash": ""
+  },
+  "docs/superpowers/plans/2026-10-10-harness-dc.md": {
+    "mtime": 1791636090.212091,
+    "seen": 1791637693.2515295,
+    "ast_hash": "7e211899eab70e82ccd134735d38bf7f",
+    "semantic_hash": ""
   }
 }
